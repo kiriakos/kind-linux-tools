@@ -1,0 +1,144 @@
+#! /bin/bash
+
+#version:   0.0.0.0.0.0.1
+#author:    Kiriakos Krastillis
+#licence:   attribution (cc-by) http://creativecommons.org/licenses/by/3.0/
+#requires:  sed, tr, bash compatible shell?
+
+## parses arguments given as a comma separated list @ $1 and exports their 
+## values to the calling shell in the form of an evaluatable string
+
+###
+### Danger this script returns just a string, in order to access the actual 
+### options you need to  eval the return string
+###
+
+## Example usage:
+##
+## 04   arguments="--maxSub:false, --subSize:false, --undo, -i, -y"
+## 05   pargs=$(pargs "$arguments" $@)
+## 06   eval $pargs
+##
+## This code snippet is the intended usage of the pargs script in another  bash
+## program. 
+## The arguments string is the description of the parameters the base
+## program can understand. In this example the base bash program tells pargs 
+## that it can understand two options (maxSub & subSize) which both have a 
+## default value of `false'. It also tells pargs that the calling program can 
+## understand three flags (--undo, -i, -y) flags are boolean options.
+##
+## Having been told the valid option names pargs will return an evaluatable 
+## string through stdout that when evaluated will create all available options
+## with their set values or default values if they were omited. Flags that are 
+## not present are `false' whereas flags that are present are `true' 
+
+## Installation:
+## 1) put the file `pargs' in a directory that is in your $PATH env 
+## 2) chmod +x pargs
+## 3) use like in "Example usage"
+
+desc="pargs, returns a string describing the call state of the script"
+usage="usage: pargs \"comma, separated, valid, args:defaults\" \$@"
+docu="you pass it a comma separated string of param:defaultValue (flags dont need the latter) like this:\n\tpargs \"flag_1, flag_2, param:32\" \$@ \nthis will check \$@ for valid flags and parameters and return a string that, when evaluated , will result in all valid options being set and all missing options defaulted (flags become false if not mentioned)\n\n\neg: the call\n\tpargs \"flag_1, flag_2, param:32\" param 110 flag_2 \n\nwill return the string\n\tflag_1=false; flag_2=true; param=110; \n\nwhich can be evaluated to set up the parent scripts default and passed arguments. This is helpful in avoiding starting scripts with awfully long parameter parsing loops\n\nNote:\npargs will remove single or double hyphens(-) from the begining of var names"
+if [[ $# -eq 0 ]]; then
+    echo -e "\n$desc\n\n\t$usage\n\n$docu\n\n"
+    exit
+fi
+
+
+#1. create the "valid args list"
+vargs=$(echo $1 | sed 's/, /,/g' |tr " " "_" | tr "," "\n")
+result=""
+declare -A vnames    #valid names
+declare -A vparams   #does name need params
+declare -A vdefaults #what is name's default value (for non flags)
+
+#generate param and defaults dictionaries and populate the defaults into the
+#result string
+for x in $vargs
+do
+    argName=$(echo $x | sed 's/:.*//g' | sed 's/^[^a-zA-Z]*//g') # fix hypenation
+    argHasParam=$( echo $x | sed "s/^[^:]*//g" ) #remove all ch in front of :
+    #dbg# echo "testing "$argName
+    if [ "$argHasParam" ]; then
+        #dbg# echo $x" has parameter ($argHasParam), is not a flag"
+        vnames["$argName"]=true
+        vparams["$argName"]=true
+        vdefaults["$argName"]=$( echo "$argHasParam"| tr -d ":")
+        if [ "$argHasParam" == ':' ]; then
+            result+="$argName=false; "
+        else
+            result+="$argName=\"${vdefaults["$argName"]}\"; "
+        fi
+    else
+        #dbg# echo $x" is a flag($argName)"
+        vnames["$argName"]=true
+        vparams["$argName"]=false
+        vdefaults["$argName"]=false
+        result+="$argName=false; "
+    fi
+    #dbg# echo
+done
+
+#debug, print the parsed array
+#dbg# echo -e "\tparams"
+#dbg# for p in "${!vparams[@]}"; do
+    #dbg# echo $p" - "${vparams[$p]}
+#dbg# done
+#dbg# echo -e "\tdefaults"
+#dbg# for p in "${!vdefaults[@]}"; do
+    #dbg# echo $p" - "${vdefaults[$p]}
+#dbg# done
+
+
+#get rid of the "valid args string"
+shift
+
+#dbg# echo "params comming in: "$@
+
+#2. loop through arguments, if you hit a varg go for it
+while [ $1 ]
+do 
+    p1=$(echo $1 | sed 's/^[^a-zA-Z]*//g')
+    # if $1 is a valid option
+    if [[ $p1 != "" && ${vnames["$p1"]} ]]; then
+        # if $1 needs a param
+        if [[ ${vparams["$p1"]} == true ]]; then
+            #dbg# echo "$p1 needs a param"
+            if [[ $# > 1 ]]; then #proceed only if enough args exist
+                #dbg# echo "setting parameter:"$1
+                vname="$p1"
+                vdefault=${vdefaults[$p1]}
+                shift
+                
+                result+="$vname=\"$1\"; " 
+                shift
+                #deprecated, args should be assigned blindly
+                ## if the upcomming parameter is another option instead of a value
+                #if [[ ${vdefaults["$1"]} ]]; then   # don't shift
+                #    result+="$vname=false; "
+                #else
+                #    #dbg# echo $1
+                #    result+="$vname=$p1; "
+                #   shift
+                #fi
+            else
+                shift # in case there are not enough args, discard the last one
+            fi
+        # if $1 is a flag
+        else
+            #dbg# echo "setting flag:"$1
+            result+="$p1=true; "
+            shift
+        fi
+    else
+        #dbg# echo "skipping: $1 $p1"
+        result+="echo \"unknown argument \\\"$p1\\\"\";"
+        shift
+    fi
+    
+done
+
+
+echo $result
+exit 0

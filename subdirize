@@ -1,0 +1,193 @@
+#! /bin/bash
+
+#version:   0.0.0.0.0.0.1
+#author:    Kiriakos Krastillis
+#licence:   attribution (cc-by) http://creativecommons.org/licenses/by/3.0/
+#requires:  pargs (preferably v0.0.0.0.0.0.1)
+
+## WARNING this is a script that has been written up hastily (see version),
+## and most probably with a high blood alcohol ratio. No guarantee on it's 
+## behavior or fittnes of use is provided.
+
+
+## subdirize: tidy up huge folders
+##
+## this tool is intended to help one create organizations of files for testing 
+## purposes. It takes all the normal files (non directories) of the current
+## directory and moves them into numbered subdirectories.
+
+## Installation:
+#   1) put the file `subdirize' in a directory that is in your $PATH env 
+#   2) chmod +x subdirize
+#   3) use like in "Examples:"
+
+## Examples:
+#    $> subdirize subSize 11
+#    moves all files of current directory into numberes subdirectories of 11 
+#    items
+#
+#    $> subdirize maxSub 123
+#    moves all files into 123 numbered subdirectories, the script will calculate
+#    the max subdirectory files from the existing files in the current directory
+#    this ensures that all subdirectories except the last one will have the same
+#    count of files
+#
+#    $> subdirize maxSub 123 subSize 4000
+#    moves all files into sub directories of 4000 files each. If, after the 123rd
+#    sub directory is filled, the base directory still has files those will be
+#    ignored
+#
+#  Asside from the above options subdirize also understands following flags:
+#   --undo  undo a subdirization, all directories of pwd will be emptied into pwd
+#   -i  generate an interactive prompt on directory creation/deletion
+#   -y  don't display the undo prompt (helpful for cron jobs)
+#
+
+usage='
+takes the files of current dir that arent directories and moves them into
+subdirectories it creates
+
+Parameters: (can be given with no, one or two hyphens "pargs style")
+
+--subSize:  the max-filecount for each subdirectory $filesInSub
+
+--maxSub:  limit the # of subs to be created if $maxSubs is reached all 
+            remaining files will not be subdirized, if -subsize not set 
+            -subsize will be calculated to accomondate all files in $maxSubs
+            directories
+            
+--undo:     initiate a desubdiriZe. This will move all files and directories in 
+            subdirs of current dir into current dir
+            
+-i:         interactive mode (whenever a directory is created or deleted you 
+            get prompted)
+            
+-y:         answer yes to the undo init prompt
+'
+
+
+##auto assign params with pargs 
+##-- WARNING -- pargs doesn't do sanitation, the eval can be dangerous
+arguments="--maxSub:false, --subSize:false, --undo, -i, -y"
+pargs=$(pargs "$arguments" $@)
+eval $pargs
+
+if [ $maxSub == false ] && [ $subSize == false ] && [ $undo == false ]; then
+    echo -e "$usage"
+    exit 0
+fi
+
+## affirm init:
+echo -e "\nstarting subdirization with arguments: \n  maxSub\t=$maxSub \n  subSize\t=$subSize \n  undo\t\t=$undo\n  i\t\t=$i\n  y\t\t=$y\n"
+
+
+#subdiriZe moves files in the current directory into subdirectories
+#   usage:  subdirize $subSize $maxSub
+function subdiriZe () {
+    echo "initiating subdiriZe $1 $2 $3"
+    currentSub=1
+    subSize=$1
+    maxSub=$2
+    interactive=$3
+    
+    #calculate subSize if not given and maxSub given
+    if [ $maxSub != false ]; then
+        if [ $subSize == false ]; then
+            echo -e 'maxSub option used without subdirectory file limit\ncalculating file limit'
+            totalFiles=$(ls -AF | grep -vc /)
+            subSize=$(($totalFiles/$maxSub +1))
+        else
+            echo 'maxSub option used with subSize, subdiriZe will leave the remaining files untouched if maxSub subdirectories have been created and are full'
+        fi
+    fi
+	#foreach file in .
+	for filo in *
+	do
+	    #create "$currentSub" if it doesn;t exist
+	    if [ ! -d "$currentSub" ]; then
+	        mkdir "$currentSub"
+	    fi
+		#echo name if is directory
+		if [ -d "$filo" ]; then
+			echo $filo" is a directory, skipping"
+		#else move it into the active category
+	    else
+	        mv ./"$filo" ./"$currentSub"/"$filo" 
+		fi
+        
+        subFiles=$(ls -1 ./"$currentSub" | wc -l)
+        if [ $subFiles -ge $subSize ]; then
+            # if subdirize is called with the i flag ask before each dir hop
+            if $interactive; then
+                echo "subdir $currentSub is full ("$subFiles" files), continue?"
+	            read -n1 -p 'y=continue | other keys = abort :' contin
+	            echo
+	            if [ $contin != 'y' ]; then
+	                echo "ok, shutting down"
+		            exit 1
+	            fi  
+	        fi
+	        oldSub=currentSub
+            currentSub=$(($currentSub+1))
+            if [ $currentSub -gt $maxSub ]; then
+                echo -e "max subdirectory limit reached and latest sub directory full. exiting"
+                break
+            fi
+            echo "sub directory $oldSub is full, current sub now is: $currentSub"
+        fi
+    
+	done
+    echo 'subdiriZe is complete'
+}
+
+
+##undo the subdirization
+##usage: desubdiriZe $interactive $yes
+function desubdiriZe () {
+    interactive=$1
+    y=$2
+    
+    if [ $y == false ]; then
+        echo "desubdiriZe is a destructive command, continue?"
+	    read -n1 -p 'y=continue | other keys = abort :' contin
+	    echo
+	    if [ $contin != 'y' ]; then
+	        echo "ok, shutting down"
+		    exit 1
+	    fi  	
+	fi
+    echo "desubdirizing"
+    
+    for sub in *; do
+        if [ -d "$sub" ]; then
+            if $interactive; then
+                subFiles=$(ls -1 ./"$sub" | wc -l)
+                echo "found subdir $sub (${subFiles} files). empty it and delete the remaining dir?"
+	            read -n1 -p 'y=proceed | other keys = abort :' contin
+	            echo
+	            if [ $contin != 'y' ]; then
+	                echo "ok, shutting down"
+		            exit 1
+	            fi  
+	        fi
+            #move every entry of the directory one level up
+            mv -i ./"$sub"/* ./
+            #remove the now empty directory
+            rmdir ./"$sub"
+        fi
+    done
+    echo 'desubdiriZe is complete'
+}
+
+##
+## Program logic :-P
+##
+
+if  $undo ; then
+    desubdiriZe $i $y
+else    
+    subdiriZe $subSize $maxSub $i
+fi
+
+
+exit 0
