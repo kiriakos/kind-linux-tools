@@ -2,7 +2,7 @@
 
 #version:   0.0.0.0.0.0.1
 #author:    Kiriakos Krastillis
-#licence:   attribution (cc-by) http://creativecommons.org/licenses/by/3.0/
+#licence:   "kindly mention me" see README
 #requires:  pargs (preferably v0.0.0.0.0.0.1)
 
 ## WARNING this is a script that has been written up hastily (see version),

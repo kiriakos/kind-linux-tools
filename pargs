@@ -2,11 +2,12 @@
 
 #version:   0.0.0.0.0.0.1
 #author:    Kiriakos Krastillis
-#licence:   attribution (cc-by) http://creativecommons.org/licenses/by/3.0/
+#licence:   "kindly mention me" see README
 #requires:  sed, tr, bash compatible shell?
 
 ## parses arguments given as a comma separated list @ $1 and exports their 
-## values to the calling shell in the form of an evaluatable string
+## values to the calling shell in the form of an evaluatable string.
+## intended as a replacement for the usual looping way with getopt/getopts
 
 ###
 ### Danger this script returns just a string, in order to access the actual 
