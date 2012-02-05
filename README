@@ -1,0 +1,35 @@
+KIND Linux Tools
+selections from a sack of tools I have found usefull for:
+-server administration
+-testing/benchmarking purposes
+-general helpers (see pagrs)
+
+All these tools are licenced with the "kindly mention me" licence which I am too 
+bored to write. For those needing details on the license here is the idea behind
+it:
+
+    "These works are published to be used.
+     You are allowed and encouraged to use 
+     and modify them for any purpose you
+     can concieve.
+     These works in general come with no
+     guarantees whatsoever, you are to use 
+     them on your own risk.
+     If you do something illegal with 
+     these works I will not be held 
+     responsible.
+     If you modify them, kindly mention my
+     contribution. 
+     Don't claim these works as yours and 
+     don't claim derivatives are mine 
+     unless they actually are my 
+     derivatives."
+     
+Tools:
+    subdirize:
+        "Move files in the current directory into numbered sub directories."
+    the source file has more information of how this works on its header        
+    
+    pargs:
+        "an interesting way to read call arguments into a script"
+    see the source file's header for more information
