@@ -2,7 +2,7 @@ KIND Linux Tools
 selections from a sack of tools I have found usefull for:
 -server administration
 -testing/benchmarking purposes
--general helpers (see pagrs)
+-general scripting helpers (see pargs)
 
 All these tools are licenced with the "kindly mention me" licence which I am too 
 bored to write. For those needing details on the license here is the idea behind
