@@ -1,0 +1,12 @@
+#! /bin/bash
+
+##  moves $1 to $1.pacorig && moves $1.pacnew to $1
+#   works only if pacnew exists and pacorig does not exist
+#
+#   version 0.1
+
+[ ! -f ${1}.pacnew ] && echo "${1}.pacnew does not exist" && exit 1
+[ -f "${1}.pacorig" ] && echo "${1}.pacorig already exists please remove it before proceeding" && exit 2 
+
+mv "$1" "${1}.pacorig"
+mv "${1}.pacnew" "$1"

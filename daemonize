@@ -1,0 +1,69 @@
+#! /bin/bash
+
+##  Daemonizes $1 (calls it in an infinte loop)
+#
+#   If you need to pass arguments to the executable pass freely after the command
+#   eg:
+#   ./usr/local/sbin/daemonize  echo  -e "\thello"
+#
+#   Arguments:
+#           Only one argument exists atm, the interval in seconds.
+#           To pass a custom interval (default is 5 sec) pass an integer as
+#           the first argument (optionally prepended with a hyphen)
+#           eg: kind-server-daemonize -35 echo "hello world"
+#
+#   Flags:
+#       -pid    instead of deamonizing the comand the program will look up if 
+#               there already exists a daemon whit $@ parameters and return 
+#               that daemon's process id.
+#
+
+
+#argument requirements
+[ $# -lt 1 ] && { echo `date`" Error: you must call this with a valid program/script as a parameter" >> $LOGFILE; exit 1; }
+
+LOGFILE="/var/log/kind-server-daemonize.log"
+
+generate_pidfile()
+{
+    local MD5=` echo -n "$@" | md5sum - | tr -cd [:alnum:]`
+    local A1=`echo "${1}" | grep -Eo "^[^ ]*"`
+    echo "/run/kind-server-daemonize_${A1}_${MD5}.pid"
+}
+
+##   in case arg 1 is pid retrieval
+if [ "$1" = "-pid" ]
+then
+    shift
+    pfile=`generate_pidfile $@`
+    [ -f $pfile ] && cat $pfile
+    exit 0
+fi
+
+##  in case arg 1 is interval
+if [ "$1" = "`echo \"$1\" | grep -oE '\-?[0-9]+'`" ]
+then
+    INTERVAL=`echo "$1" | grep -oE '[0-9]+'`
+    shift
+
+else
+    INTERVAL=5
+fi
+
+#basic validation
+[ $# -lt 1 ] && { echo `date`" Error: you must call this with a valid program/script as a parameter" >> $LOGFILE; exit 1; }
+type "$1" >/dev/null 2>&1 || { echo `date`" Error: $1 does not exist or is not executable.  Aborting." >> $LOGFILE; exit 1;}
+
+
+PIDFILE=`generate_pidfile $@`
+
+##add a pid file to /run & trap the HUP INT and TERM signals
+echo "$$" > $PIDFILE && trap "rm $PIDFILE; exit 0" SIGHUP SIGINT SIGTERM
+
+while [ true ]
+do
+    $@
+    sleep $INTERVAL
+done
+
+exit 0

@@ -49,13 +49,22 @@ subdirectories it creates
 
 Parameters: (can be given with no, one or two hyphens "pargs style")
 
+    Subdirization types:
+
 --subSize:  the max-filecount for each subdirectory $filesInSub
 
---maxSub:  limit the # of subs to be created if $maxSubs is reached all 
+--maxSub:   limit the # of subs to be created if $maxSubs is reached all 
             remaining files will not be subdirized, if -subsize not set 
             -subsize will be calculated to accomondate all files in $maxSubs
             directories
+
+--alnum:     WIP: In stead of creating numeric sub directories create sub
+            directories based on the name of the files. This param can be 
+            accompanied by an integer that will determine how many chars from 
+            the front of the filename to use as a sub directory
             
+    Options & flags:
+
 --undo:     initiate a desubdiriZe. This will move all files and directories in 
             subdirs of current dir into current dir
             
@@ -63,23 +72,71 @@ Parameters: (can be given with no, one or two hyphens "pargs style")
             get prompted)
             
 -y:         answer yes to the undo init prompt
+
+-chars:     Only applicable to --alnum subdirization determines the number of
+            chars that will be used to create sub directories from file names.
+            Default = 2 larger values give better granularity for large sets
+            but can lead to directories with only a single file of content.
 '
 
 
 ##auto assign params with pargs 
 ##-- WARNING -- pargs doesn't do sanitation, the eval can be dangerous
-arguments="--maxSub:false, --subSize:false, --undo, -i, -y"
+arguments="--maxSub:false, --subSize:false, chars:2, --alnum, --undo, -i, -y"
 pargs=$(pargs "$arguments" $@)
 eval $pargs
 
-if [ $maxSub == false ] && [ $subSize == false ] && [ $undo == false ]; then
+#redirect blank calls to help
+if [ $maxSub == false ] && [ $subSize == false ] && [ $undo == false ] && 
+ [ $alnum == false ]; then
     echo -e "$usage"
     exit 0
 fi
 
 ## affirm init:
-echo -e "\nstarting subdirization with arguments: \n  maxSub\t=$maxSub \n  subSize\t=$subSize \n  undo\t\t=$undo\n  i\t\t=$i\n  y\t\t=$y\n"
+echo -e "\nstarting subdirization with arguments: \n  maxSub\t=$maxSub \n  subSize\t=$subSize \n  alnum\t\t=$alnum\n  undo\t\t=$undo\n  i\t\t=$i\n  y\t\t=$y\n "
 
+## create alnum dirs of files in pwd using $1 chars fron the start of each file
+function createAlnumDirs () {
+    #invocation has to be with one arg the value of allnum
+    chars=$1
+    dirnames=`ls -1 |sed 's/[ ()\._-]//' | grep -o -E "^[^\.]{1,${chars}}"`
+    dirnames=`echo $dirnames | tr ' ' '\n' | sort | uniq | tr '\n' ' '`
+    # -p sholuld suppress `existing directory` errors
+    mkdir -p $dirnames
+}
+
+function moveAlnumFiles () {
+    chars=$1
+    #foreach file in .
+	for filo in *
+	do
+	    dirnam=`echo $filo | sed 's/[ ()\._-]//' `
+	    currentSub=${dirnam:0:chars}
+	    #create "$currentSub" if it doesn;t exist
+	    if [ ! -d "$currentSub" ]; then
+	        echo "$currentsub wasnt craeted, creating now"
+            # -p sholuld suppress `existing directory` errors
+	        mkdir -p "$currentSub"
+	    fi
+		#echo name if is directory
+		if [ -d "$filo" ]; then
+			echo $filo" is a directory, skipping"
+		#else move it into the active category
+	    else
+	        mv ./"$filo" ./"$currentSub"/"$filo" 
+		fi
+		
+	done
+}
+
+function alnumiZe () {
+    chars=$1
+    
+    createAlnumDirs $chars;
+    
+    moveAlnumFiles $chars;
+}
 
 #subdiriZe moves files in the current directory into subdirectories
 #   usage:  subdirize $subSize $maxSub
@@ -129,9 +186,11 @@ function subdiriZe () {
 	        fi
 	        oldSub=currentSub
             currentSub=$(($currentSub+1))
-            if [ $currentSub -gt $maxSub ]; then
-                echo -e "max subdirectory limit reached and latest sub directory full. exiting"
-                break
+            if [ $maxSub != false ] ; then
+                if [ $currentSub -gt $maxSub ]; then
+                    echo -e "max subdirectory limit reached and latest sub directory full. exiting"
+                    break
+                fi
             fi
             echo "sub directory $oldSub is full, current sub now is: $currentSub"
         fi
@@ -185,7 +244,12 @@ function desubdiriZe () {
 
 if  $undo ; then
     desubdiriZe $i $y
-else    
+
+elif $alnum ; then    
+
+    alnumiZe $chars
+
+else     
     subdiriZe $subSize $maxSub $i
 fi
 
